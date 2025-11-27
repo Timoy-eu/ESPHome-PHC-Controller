@@ -13,7 +13,7 @@ CHANNEL = "channel"
 AMD_ns = cg.esphome_ns.namespace("AMD_binary")
 AMD = AMD_ns.class_("AMD_switch", switch.Switch, cg.Component)
 
-CONFIG_SCHEMA = switch.SWITCH_SCHEMA.extend(
+CONFIG_SCHEMA = switch._SWITCH_SCHEMA.extend(
     {
         cv.GenerateID(): cv.declare_id(AMD),
         cv.Optional(CONF_DEVICE_CLASS, default=DEVICE_CLASS_OUTLET): cv.string,

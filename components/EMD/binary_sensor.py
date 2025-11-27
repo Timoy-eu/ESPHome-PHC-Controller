@@ -14,7 +14,7 @@ CHANNEL = "channel"
 EMD_ns = cg.esphome_ns.namespace("EMD_binary_sensor")
 EMD = EMD_ns.class_("EMD", binary_sensor.BinarySensor, cg.Component)
 
-CONFIG_SCHEMA = binary_sensor.BINARY_SENSOR_SCHEMA.extend(
+CONFIG_SCHEMA = binary_sensor._BINARY_SENSOR_SCHEMA.extend(
     {
         cv.GenerateID(): cv.declare_id(EMD),
         cv.Required(CONTROLLER_ID): cv.use_id(PHCController),

@@ -29,7 +29,7 @@ def _validate(config):
 
 
 CONFIG_SCHEMA = cv.All(
-    cover.COVER_SCHEMA.extend(
+    cover._COVER_SCHEMA.extend(
         {
             cv.GenerateID(): cv.declare_id(JRMCover),
             cv.Required(CONTROLLER_ID): cv.use_id(PHCController),
