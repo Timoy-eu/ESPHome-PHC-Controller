@@ -1,10 +1,7 @@
 #include "esphome/core/log.h"
 #include "PHCController.h"
 #include "esphome/components/uart/uart.h"
-
-#ifdef USE_ESP32_FRAMEWORK_ARDUINO
-#include "esphome/components/uart/uart_component_esp32_arduino.h"
-#endif
+#include "esphome/components/uart/uart_component.h"
 
 namespace esphome
 {
@@ -13,19 +10,32 @@ namespace esphome
 
         static const char *TAG = "phc_controller";
 
+        class UARTComponentAccessor : public uart::UARTComponent {
+        public:
+            #ifdef USE_ESP32_FRAMEWORK_ARDUINO
+            HardwareSerial *get_hw_serial_hack() {
+                return this->hw_serial_;
+            }
+            #endif
+        };
+
+
         void PHCController::setup()
         {
             /*
-            Since Arduino Core version 2.0.0+ the timing of acknowledgement messages is too large, the reason for this issue is related to the way in which the uart input buffer is pocessed
-            See these related issues
-            https://github.com/espressif/arduino-esp32/issues/6689
-            https://github.com/espressif/arduino-esp32/issues/6921
-            setRxFIFOFull(1) is used to force immediate parsing of incoming data which fixes the delay issue
+            Since Arduino Core version 2.0.0+ the timing of acknowledgement messages is too large...
             */
 #ifdef USE_ESP32_FRAMEWORK_ARDUINO
-            uart::ESP32ArduinoUARTComponent *uartComponent = static_cast<uart::ESP32ArduinoUARTComponent *>(this->parent_);
-            uartComponent->get_hw_serial()->setRxTimeout(1);
-            uartComponent->get_hw_serial()->setRxFIFOFull(1);
+            // Wir nutzen den Accessor-Trick, um an das HardwareSerial Objekt zu kommen
+            auto *uartAccessor = static_cast<UARTComponentAccessor *>(this->parent_);
+            HardwareSerial *hw = uartAccessor->get_hw_serial_hack();
+
+            if (hw != nullptr) {
+                hw->setRxTimeout(1);
+                hw->setRxFIFOFull(1);
+            } else {
+                ESP_LOGW(TAG, "Could not access HardwareSerial to apply FIFO fix!");
+            }
 #else
 #pragma message("Response timings on the IDF Framework are likely incorrect. Please use the Arduino Framework and ideally an ESP32.")
             ESP_LOGW(TAG, "Response timings on the IDF Framework are likely incorrect. Please use the Arduino Framework and ideally an ESP32.");
