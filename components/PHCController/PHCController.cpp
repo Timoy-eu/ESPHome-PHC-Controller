@@ -2,6 +2,10 @@
 #include "PHCController.h"
 #include "esphome/components/uart/uart.h"
 
+#ifdef USE_ESP32_FRAMEWORK_ARDUINO
+#include "esphome/components/uart/uart_component_esp32_arduino.h"
+#endif
+
 namespace esphome
 {
     namespace phc_controller
