@@ -1,10 +1,11 @@
 #include "esphome/core/log.h"
 #include "PHCController.h"
 #include "esphome/components/uart/uart.h"
-#include "esphome/components/uart/uart_component.h"
 
+// Wir binden direkt die ESP32 Treiber-Bibliothek ein.
+// Das ist sicher, stabil und verursacht keine Speicherfehler.
 #ifdef USE_ESP32_FRAMEWORK_ARDUINO
-#include <HardwareSerial.h>
+#include <driver/uart.h>
 #endif
 
 namespace esphome
@@ -14,38 +15,32 @@ namespace esphome
 
         static const char *TAG = "phc_controller";
 
-        // --- HACK START ---
-        // Da die Header-Datei für ESP32ArduinoUARTComponent fehlt und UARTComponent
-        // das Member 'hw_serial_' nicht öffentlich hat, bauen wir uns eine
-        // lokale Struktur, die das Speicherlayout imitiert.
-        #ifdef USE_ESP32_FRAMEWORK_ARDUINO
-        class UARTComponentHack : public uart::UARTComponent {
-        public:
-            // Wir gehen davon aus, dass hw_serial_ das erste Member nach der Basisklasse ist.
-            // Das ist bei den meisten Versionen der Fall.
-            HardwareSerial *hw_serial_;
-        };
-        #endif
-        // --- HACK END ---
-
         void PHCController::setup()
         {
             /*
-            Since Arduino Core version 2.0.0+ the timing of acknowledgement messages is too large...
+            FIX: Anstatt das Arduino-Objekt über unsichere Speicherzugriffe zu patchen
+            (was zum Absturz xQueueSemaphoreTake führte), greifen wir direkt auf
+            die Low-Level Hardware-Ebene zu.
             */
 #ifdef USE_ESP32_FRAMEWORK_ARDUINO
-            // Wir nutzen reinterpret_cast, um den Pointer "umzuinterpretieren"
-            auto *uart_hack = reinterpret_cast<UARTComponentHack *>(this->parent_);
+            // Wir prüfen alle 3 möglichen Hardware-UART-Ports des ESP32.
+            const uart_port_t ports[] = {UART_NUM_0, UART_NUM_1, UART_NUM_2};
 
-            // Sicherheitscheck, ob der Pointer gültig aussieht
-            if (uart_hack && uart_hack->hw_serial_) {
-                uart_hack->hw_serial_->setRxTimeout(1);
-                uart_hack->hw_serial_->setRxFIFOFull(1);
-            } else {
-                ESP_LOGW(TAG, "Could not apply FIFO fix: hw_serial_ not found via hack.");
+            for (uart_port_t port : ports) {
+                // Prüfen, ob ESPHome den Treiber für diesen Port installiert hat.
+                // Falls ja, wenden wir den Fix an. Falls nein, ignorieren wir ihn.
+                if (uart_is_driver_installed(port)) {
+
+                    // 1. RX FIFO Full Threshold auf 1 setzen (löst Interrupt sofort aus)
+                    uart_set_rx_full_threshold(port, 1);
+
+                    // 2. Timeout ebenfalls minimieren
+                    uart_set_rx_timeout(port, 1);
+
+                    ESP_LOGI(TAG, "Applied low-latency fix to UART Port %d", port);
+                }
             }
 #else
-#pragma message("Response timings on the IDF Framework are likely incorrect. Please use the Arduino Framework and ideally an ESP32.")
             ESP_LOGW(TAG, "Response timings on the IDF Framework are likely incorrect. Please use the Arduino Framework and ideally an ESP32.");
 #endif
 
