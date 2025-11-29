@@ -3,6 +3,10 @@
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/uart/uart_component.h"
 
+#ifdef USE_ESP32_FRAMEWORK_ARDUINO
+#include <HardwareSerial.h>
+#endif
+
 namespace esphome
 {
     namespace phc_controller
@@ -10,15 +14,19 @@ namespace esphome
 
         static const char *TAG = "phc_controller";
 
-        class UARTComponentAccessor : public uart::UARTComponent {
+        // --- HACK START ---
+        // Da die Header-Datei für ESP32ArduinoUARTComponent fehlt und UARTComponent
+        // das Member 'hw_serial_' nicht öffentlich hat, bauen wir uns eine
+        // lokale Struktur, die das Speicherlayout imitiert.
+        #ifdef USE_ESP32_FRAMEWORK_ARDUINO
+        class UARTComponentHack : public uart::UARTComponent {
         public:
-            #ifdef USE_ESP32_FRAMEWORK_ARDUINO
-            HardwareSerial *get_hw_serial_hack() {
-                return this->hw_serial_;
-            }
-            #endif
+            // Wir gehen davon aus, dass hw_serial_ das erste Member nach der Basisklasse ist.
+            // Das ist bei den meisten Versionen der Fall.
+            HardwareSerial *hw_serial_;
         };
-
+        #endif
+        // --- HACK END ---
 
         void PHCController::setup()
         {
@@ -26,15 +34,15 @@ namespace esphome
             Since Arduino Core version 2.0.0+ the timing of acknowledgement messages is too large...
             */
 #ifdef USE_ESP32_FRAMEWORK_ARDUINO
-            // Wir nutzen den Accessor-Trick, um an das HardwareSerial Objekt zu kommen
-            auto *uartAccessor = static_cast<UARTComponentAccessor *>(this->parent_);
-            HardwareSerial *hw = uartAccessor->get_hw_serial_hack();
+            // Wir nutzen reinterpret_cast, um den Pointer "umzuinterpretieren"
+            auto *uart_hack = reinterpret_cast<UARTComponentHack *>(this->parent_);
 
-            if (hw != nullptr) {
-                hw->setRxTimeout(1);
-                hw->setRxFIFOFull(1);
+            // Sicherheitscheck, ob der Pointer gültig aussieht
+            if (uart_hack && uart_hack->hw_serial_) {
+                uart_hack->hw_serial_->setRxTimeout(1);
+                uart_hack->hw_serial_->setRxFIFOFull(1);
             } else {
-                ESP_LOGW(TAG, "Could not access HardwareSerial to apply FIFO fix!");
+                ESP_LOGW(TAG, "Could not apply FIFO fix: hw_serial_ not found via hack.");
             }
 #else
 #pragma message("Response timings on the IDF Framework are likely incorrect. Please use the Arduino Framework and ideally an ESP32.")
@@ -56,7 +64,6 @@ namespace esphome
 
         void PHCController::loop()
         {
-
             if (available())
             {
                 // Holds the abs. and relative address of the device
@@ -213,8 +220,6 @@ namespace esphome
                         {
                             auto *jrm = jrms_[util::key(device_id, i)];
                             // For some reason the cover ack-message does not contain which covers are moving, so we are guessing that the channel has been processed
-                            // This might lead to one cover not moving if 2 are manipulated at the same time
-                            // Only accepting a single change will increase the chance of correct acknowledgement
                             if (jrm->current_operation != jrm->get_target_operation())
                             {
                                 jrm->current_operation = jrm->get_target_operation();
