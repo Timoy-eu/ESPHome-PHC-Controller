@@ -1,11 +1,6 @@
 #include "esphome/core/log.h"
 #include "PHCController.h"
-
-#ifdef USE_ESP32_FRAMEWORK_ARDUINO
-#include "esphome/components/uart/uart_component_esp32_arduino.h"
-#elif USE_ESP8266
-#include "esphome/components/uart/uart_component_esp8266.h"
-#endif
+#include "esphome/components/uart/uart.h"
 
 namespace esphome
 {
