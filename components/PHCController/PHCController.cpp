@@ -66,8 +66,8 @@ namespace esphome
                 if (content_length > 3)
                     return;
 
-                // Read the actual message content
-                uint8_t msg[content_length + 2];
+                // Read the actual message content (2 byte prefix + content + 2 byte checksum)
+                uint8_t msg[content_length + 4];
                 msg[0] = address;
                 msg[1] = toggle_and_length;
                 read_array(msg + 2, content_length + 2); // read content and checksum
@@ -135,8 +135,15 @@ namespace esphome
                 if (message[0] == 0x00)
                 {
                     bool handled = false;
-                    uint8_t channels = message[1];
-                    for (uint8_t i = 0; i < 8; i++)
+                    // Each status byte covers 8 channels, a second byte (channels 8-15) is only present in longer messages
+                    uint16_t channels = message[1];
+                    uint8_t channel_count = 8;
+                    if (*length >= 3)
+                    {
+                        channels |= message[2] << 8;
+                        channel_count = 16;
+                    }
+                    for (uint8_t i = 0; i < channel_count; i++)
                     {
                         if (emd_lights_.count(util::key(device_id, i)))
                         {
@@ -294,7 +301,7 @@ namespace esphome
             for (auto const &module : emds_)
             {
                 if (std::find(addresses.begin(), addresses.end(), module.second->get_address()) == addresses.end())
-                    addresses.push_back(module.first);
+                    addresses.push_back(module.second->get_address());
             }
 
             // Send all known EMD Configurations
@@ -312,7 +319,7 @@ namespace esphome
             for (auto const &module : jrms_)
             {
                 if (std::find(addresses.begin(), addresses.end(), module.second->get_address()) == addresses.end())
-                    addresses.push_back(module.first);
+                    addresses.push_back(module.second->get_address());
             }
 
             // Send all known AMD Configurations

@@ -46,7 +46,7 @@ namespace esphome
              */
             void set_max_close_time(uint32_t time)
             {
-                max_open_time_ = time / 100;
+                max_close_time_ = time / 100;
             };
 
             /**
@@ -56,7 +56,7 @@ namespace esphome
              */
             void set_max_open_time(uint32_t time)
             {
-                max_close_time_ = time / 100;
+                max_open_time_ = time / 100;
             };
 
             /**
