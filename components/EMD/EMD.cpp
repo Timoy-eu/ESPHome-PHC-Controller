@@ -11,7 +11,7 @@ namespace esphome
 
         void EMD::setup()
         {
-            set_disabled_by_default(true);
+            // disabled_by_default is set via the python schema, the runtime setter no longer exists
             publish_initial_state(false);
         }
 

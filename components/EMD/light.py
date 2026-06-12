@@ -2,7 +2,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import light
 from esphome.components.light import LightType
-from esphome.const import CONF_OUTPUT_ID
+from esphome.const import CONF_DISABLED_BY_DEFAULT, CONF_OUTPUT_ID
 
 from ..PHCController import CONTROLLER_ID, PHCController
 
@@ -21,6 +21,7 @@ CONFIG_SCHEMA = (
     .extend(
         {
             cv.GenerateID(CONF_OUTPUT_ID): cv.declare_id(EMDLight),
+            cv.Optional(CONF_DISABLED_BY_DEFAULT, default=True): cv.boolean,
             cv.Required(CONTROLLER_ID): cv.use_id(PHCController),
             cv.Required(ADDRESS): cv.int_range(min=0, max=31),
             cv.Required(CHANNEL): cv.int_range(min=0, max=15),

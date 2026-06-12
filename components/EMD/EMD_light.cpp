@@ -10,7 +10,7 @@ namespace esphome
 
         void EMD_light::setup()
         {
-            set_disabled_by_default(true);
+            // disabled_by_default is set via the python schema, the runtime setter no longer exists
         }
 
         void EMD_light::loop()

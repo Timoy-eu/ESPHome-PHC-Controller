@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import binary_sensor
-from esphome.const import CONF_ID
+from esphome.const import CONF_DISABLED_BY_DEFAULT, CONF_ID
 
 from ..PHCController import CONTROLLER_ID, PHCController
 
@@ -19,6 +19,7 @@ CONFIG_SCHEMA = (
     .extend(
         {
             cv.GenerateID(): cv.declare_id(EMD),
+            cv.Optional(CONF_DISABLED_BY_DEFAULT, default=True): cv.boolean,
             cv.Required(CONTROLLER_ID): cv.use_id(PHCController),
             cv.Required(ADDRESS): cv.int_range(min=0, max=31),
             cv.Required(CHANNEL): cv.int_range(min=0, max=15),
