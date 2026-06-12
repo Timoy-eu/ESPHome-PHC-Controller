@@ -5,6 +5,8 @@ from esphome.const import CONF_ID
 
 from ..PHCController import CONTROLLER_ID, PHCController
 
+DEPENDENCIES = ["PHCController"]
+
 JRM_cover_ns = cg.esphome_ns.namespace("JRM_cover")
 JRMCover = JRM_cover_ns.class_("JRM", cover.Cover, cg.Component)
 
@@ -29,7 +31,8 @@ def _validate(config):
 
 
 CONFIG_SCHEMA = cv.All(
-    cover.COVER_SCHEMA.extend(
+    cover.cover_schema(JRMCover)
+    .extend(
         {
             cv.GenerateID(): cv.declare_id(JRMCover),
             cv.Required(CONTROLLER_ID): cv.use_id(PHCController),
@@ -68,7 +71,8 @@ CONFIG_SCHEMA = cv.All(
                 }
             ),
         }
-    ).extend(cv.COMPONENT_SCHEMA),
+    )
+    .extend(cv.COMPONENT_SCHEMA),
     _validate,
 )
 
