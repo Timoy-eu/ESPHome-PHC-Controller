@@ -62,28 +62,24 @@ namespace esphome
                 uint8_t content_length = toggle_and_length & 0x7F; // Mask everything except for the MSB (message length)
 
                 // Assert message length is plausible; an implausible length means we are out of sync
-                // or looking at junk, so drain whatever is buffered and resync next loop.
+                // or looking at junk. Just return: the two consumed header bytes are dropped and we
+                // resync on the next loop. We must NOT drain the whole buffer here - on a busy or
+                // electrically stuck bus that data keeps arriving as fast as we read it, so an
+                // unbounded drain never returns and hangs the whole device.
                 if (content_length > 3)
-                {
-                    while (available() > 0)
-                        read();
                     return;
-                }
 
                 // Wait briefly for the remainder of the frame (content + 2 byte checksum) to arrive.
                 // A complete frame is fully received within a few byte-times at 19200 baud; if it does
-                // not show up, the bytes were noise/a bus-turnaround glitch, so drain them and resync on
-                // the next loop instead of blocking for the 100 ms UART read timeout.
+                // not show up the bytes were noise/a bus-turnaround glitch, so drop the consumed header
+                // and resync next loop (again, no unbounded drain) instead of blocking for the 100 ms
+                // UART read timeout.
                 uint8_t remaining = content_length + 2;
                 frame_start = millis();
                 while (available() < remaining && millis() - frame_start < 5)
                     yield();
                 if (available() < remaining)
-                {
-                    while (available() > 0)
-                        read();
                     return;
-                }
 
                 // Read the actual message content (2 byte prefix + content + 2 byte checksum)
                 uint8_t msg[content_length + 4];
