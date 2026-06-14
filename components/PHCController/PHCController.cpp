@@ -40,6 +40,20 @@ namespace esphome
 
             if (available())
             {
+                // A frame starts with a 2 byte header (address + toggle/length). If only a single
+                // byte is buffered it might be the start of an incoming frame, so give the rest a
+                // few byte-times to arrive. If nothing follows it was a leftover echo/bus-turnaround
+                // glitch byte: drain it, otherwise it would keep available() != 0 and permanently
+                // block every (weak) transmission.
+                uint32_t frame_start = millis();
+                while (available() < 2 && millis() - frame_start < 5)
+                    yield();
+                if (available() < 2)
+                {
+                    read(); // drop the stray byte and resync next loop
+                    return;
+                }
+
                 // Holds the abs. and relative address of the device
                 uint8_t address = read();
 
@@ -47,15 +61,35 @@ namespace esphome
                 bool toggle = toggle_and_length & 0x80;            // Mask the MRB (toggle bit)
                 uint8_t content_length = toggle_and_length & 0x7F; // Mask everything except for the MSB (message length)
 
-                // Assert message length is plausible
+                // Assert message length is plausible; an implausible length means we are out of sync
+                // or looking at junk, so drain whatever is buffered and resync next loop.
                 if (content_length > 3)
+                {
+                    while (available() > 0)
+                        read();
                     return;
+                }
+
+                // Wait briefly for the remainder of the frame (content + 2 byte checksum) to arrive.
+                // A complete frame is fully received within a few byte-times at 19200 baud; if it does
+                // not show up, the bytes were noise/a bus-turnaround glitch, so drain them and resync on
+                // the next loop instead of blocking for the 100 ms UART read timeout.
+                uint8_t remaining = content_length + 2;
+                frame_start = millis();
+                while (available() < remaining && millis() - frame_start < 5)
+                    yield();
+                if (available() < remaining)
+                {
+                    while (available() > 0)
+                        read();
+                    return;
+                }
 
                 // Read the actual message content (2 byte prefix + content + 2 byte checksum)
                 uint8_t msg[content_length + 4];
                 msg[0] = address;
                 msg[1] = toggle_and_length;
-                read_array(msg + 2, content_length + 2); // read content and checksum
+                read_array(msg + 2, remaining); // read content and checksum
 
                 // Read the checksum
                 uint16_t msg_checksum = msg[content_length + 3] << 8 | msg[content_length + 2];
@@ -360,6 +394,20 @@ namespace esphome
                 delay(FLOW_PIN_PULL_LOW_DELAY);
                 flow_control_pin_->digital_write(false);
             }
+
+            // On a half-duplex bus the transceiver echoes everything we transmit back onto RX.
+            // (This is especially true for auto-direction transceivers without a flow control pin.)
+            // The preceding flush()/delay(1) guarantees the full echo has been received by now, so
+            // discard our own echo here. Otherwise it keeps available() != 0, which would make the
+            // weak-write guard above skip every following transmission (modules never get the
+            // command -> "Device not responding") and would trigger spurious read timeouts in loop().
+            // Only consume bytes that are already buffered, and never more than we sent, so an
+            // overlapping module response is left untouched for loop() to process.
+            size_t echo = available();
+            if (echo > len)
+                echo = len;
+            for (size_t i = 0; i < echo; i++)
+                read();
         }
     } // namespace phc_controller
 } // namespace esphome
