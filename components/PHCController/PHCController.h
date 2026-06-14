@@ -7,6 +7,7 @@
 #include "../EMD/EMD.h"
 #include "../EMD/EMD_light.h"
 #include "../JRM/JRM.h"
+#include <vector>
 
 #define FLOW_PIN_PULL_HIGH_DELAY 0
 #define FLOW_PIN_PULL_LOW_DELAY 0
@@ -192,6 +193,16 @@ namespace esphome
              *
              */
             bool states_synced_ = false;
+
+            /**
+             * @brief Non-blocking start-up state sync. Instead of blocking the loop for
+             * (modules * 40ms) at once (which trips the watchdog on large installations),
+             * one queued module is synced per >=40ms tick driven from loop().
+             */
+            std::vector<util::Module *> sync_queue_;
+            size_t sync_index_ = 0;
+            uint32_t last_sync_step_ = 0;
+            bool sync_started_ = false;
         };
 
     } // namespace phc_controller

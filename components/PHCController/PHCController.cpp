@@ -111,13 +111,7 @@ namespace esphome
             }
 
             if (!states_synced_)
-            {
-                if (millis() - last_message_time_ > INITIAL_SYNC_DELAY * 1000)
-                {
-                    sync_states();
-                    states_synced_ = true;
-                }
-            }
+                sync_states();
         }
 
         void PHCController::dump_config()
@@ -348,20 +342,45 @@ namespace esphome
 
         void PHCController::sync_states()
         {
-            for (auto const &emd_light : emd_lights_)
+            // Non-blocking start-up sync. The old implementation looped over every module with a
+            // blocking delay(40), which on a full installation (dozens of AMD/JRM modules) blocked
+            // the loop for several seconds at once and tripped the watchdog -> reset -> OTA rollback.
+            // Instead we build a queue once (after the initial settle delay) and sync one module per
+            // >=40ms tick, so the loop keeps running and stays responsive.
+
+            if (!sync_started_)
             {
-                emd_light.second->sync_state();
-                delay(40);
+                if (millis() - last_message_time_ < (uint32_t)INITIAL_SYNC_DELAY * 1000)
+                    return;
+
+                for (auto const &emd_light : emd_lights_)
+                    sync_queue_.push_back(emd_light.second);
+                for (auto const &amd : amds_)
+                    sync_queue_.push_back(amd.second);
+                for (auto const &jrm : jrms_)
+                    sync_queue_.push_back(jrm.second);
+
+                sync_started_ = true;
+                last_sync_step_ = millis();
+                return;
             }
-            for (auto const &amd : amds_)
+
+            // Space the sync messages out so the bus is not flooded (one module per >=40ms).
+            if (millis() - last_sync_step_ < 40)
+                return;
+
+            if (sync_index_ < sync_queue_.size())
             {
-                amd.second->sync_state();
-                delay(40);
+                sync_queue_[sync_index_]->sync_state();
+                sync_index_++;
+                last_sync_step_ = millis();
             }
-            for (auto const &jrm : jrms_)
+
+            if (sync_index_ >= sync_queue_.size())
             {
-                jrm.second->sync_state();
-                delay(40);
+                states_synced_ = true;
+                sync_queue_.clear();
+                sync_queue_.shrink_to_fit();
             }
         }
 
