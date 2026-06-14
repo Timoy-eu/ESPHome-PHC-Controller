@@ -1,14 +1,6 @@
 #include "esphome/core/log.h"
 #include "PHCController.h"
 
-#ifdef USE_ESP32_FRAMEWORK_ARDUINO
-#include "esphome/components/uart/uart_component_esp32_arduino.h"
-#elif USE_ESP8266
-#include "esphome/components/uart/uart_component_esp8266.h"
-#elif USE_ESP_IDF
-#include "esphome/components/uart/uart_component_esp_idf.h"
-#endif
-
 namespace esphome
 {
     namespace phc_controller
@@ -23,19 +15,12 @@ namespace esphome
             See these related issues
             https://github.com/espressif/arduino-esp32/issues/6689
             https://github.com/espressif/arduino-esp32/issues/6921
-            setRxFIFOFull(1) is used to force immediate parsing of incoming data which fixes the delay issue
+            A small rx full threshold / rx timeout is used to force immediate parsing of incoming data which fixes the delay issue.
+            These are applied through the framework-agnostic UARTComponent interface; the UART (setup_priority::BUS) is already
+            initialised by the time this component (setup_priority::HARDWARE) runs, so the new values take effect immediately.
             */
-#ifdef USE_ESP32_FRAMEWORK_ARDUINO
-#pragma message("Arduino Framework only supported until ESPHome 2025.9!")
-            uart::ESP32ArduinoUARTComponent *uartComponent = static_cast<uart::ESP32ArduinoUARTComponent *>(this->parent_);
-            uartComponent->get_hw_serial()->setRxTimeout(1);
-            uartComponent->get_hw_serial()->setRxFIFOFull(1);
-#elif USE_ESP_IDF
-            uart::IDFUARTComponent *uartComponent = static_cast<uart::IDFUARTComponent *>(this->parent_);
-            uart_port_t hw_serial_number = static_cast<uart_port_t>(uartComponent->get_hw_serial_number());
-            uart_set_rx_timeout(hw_serial_number, 1);
-            uart_set_rx_full_threshold(hw_serial_number, 1);
-#endif
+            this->parent_->set_rx_timeout(1);
+            this->parent_->set_rx_full_threshold(1);
 
             if (flow_control_pin_ != NULL)
             {
