@@ -397,17 +397,23 @@ namespace esphome
 
             // On a half-duplex bus the transceiver echoes everything we transmit back onto RX.
             // (This is especially true for auto-direction transceivers without a flow control pin.)
-            // The preceding flush()/delay(1) guarantees the full echo has been received by now, so
-            // discard our own echo here. Otherwise it keeps available() != 0, which would make the
-            // weak-write guard above skip every following transmission (modules never get the
-            // command -> "Device not responding") and would trigger spurious read timeouts in loop().
-            // Only consume bytes that are already buffered, and never more than we sent, so an
-            // overlapping module response is left untouched for loop() to process.
-            size_t echo = available();
-            if (echo > len)
-                echo = len;
-            for (size_t i = 0; i < echo; i++)
+            // Discard our own echo so it cannot keep available() != 0 and make the weak-write guard
+            // above skip every following transmission ("Device not responding") or trigger spurious
+            // read timeouts in loop().
+            //
+            // Crucially we must NOT blindly drop a fixed number of bytes: PHC modules start answering
+            // ~250us after the command, so by the time we get here the start of a real response may
+            // already be buffered right behind the echo. Instead, peek each byte and only drop it
+            // while it still matches what we sent. The first non-matching byte is the beginning of a
+            // real module response and is left untouched for loop() to process. The available() guard
+            // keeps peek_byte() from blocking on an empty buffer.
+            for (size_t i = 0; i < len; i++)
+            {
+                uint8_t echo_byte;
+                if (!available() || !peek_byte(&echo_byte) || echo_byte != data[i])
+                    break;
                 read();
+            }
         }
     } // namespace phc_controller
 } // namespace esphome
