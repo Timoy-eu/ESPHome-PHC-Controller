@@ -415,25 +415,13 @@ namespace esphome
                 flow_control_pin_->digital_write(false);
             }
 
-            // On a half-duplex bus the transceiver echoes everything we transmit back onto RX.
-            // (This is especially true for auto-direction transceivers without a flow control pin.)
-            // Discard our own echo so it cannot keep available() != 0 and make the weak-write guard
-            // above skip every following transmission ("Device not responding") or trigger spurious
-            // read timeouts in loop().
-            //
-            // Crucially we must NOT blindly drop a fixed number of bytes: PHC modules start answering
-            // ~250us after the command, so by the time we get here the start of a real response may
-            // already be buffered right behind the echo. Instead, peek each byte and only drop it
-            // while it still matches what we sent. The first non-matching byte is the beginning of a
-            // real module response and is left untouched for loop() to process. The available() guard
-            // keeps peek_byte() from blocking on an empty buffer.
-            for (size_t i = 0; i < len; i++)
-            {
-                uint8_t echo_byte;
-                if (!available() || !peek_byte(&echo_byte) || echo_byte != data[i])
-                    break;
-                read();
-            }
+            // NOTE: We deliberately do NOT discard our own echo here. On this half-duplex bus the
+            // transceiver echoes everything we send, but the echo is a fully valid frame and loop()
+            // reads it like any other and ignores it (it is neither a 0x00 ack nor a 0xFF config
+            // request). Trying to strip the echo by content is unsafe: every PHC frame for a given
+            // module class shares the same leading address byte, so a module acknowledgement that is
+            // already buffered (modules answer ~250us after the command) would have its leading byte
+            // consumed too, shifting the whole frame by one byte and corrupting the checksum.
         }
     } // namespace phc_controller
 } // namespace esphome
