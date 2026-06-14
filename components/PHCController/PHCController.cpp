@@ -50,8 +50,7 @@ namespace esphome
                     yield();
                 if (available() < 2)
                 {
-                    uint8_t stray = read(); // drop the stray byte and resync next loop
-                    ESP_LOGD(TAG, "RX-DIAG: lone byte 0x%02X dropped", stray);
+                    read(); // drop the stray byte and resync next loop
                     return;
                 }
 
@@ -66,13 +65,8 @@ namespace esphome
                 // or looking at junk, so drain whatever is buffered and resync next loop.
                 if (content_length > 3)
                 {
-                    uint8_t drained = 0;
                     while (available() > 0)
-                    {
                         read();
-                        drained++;
-                    }
-                    ESP_LOGD(TAG, "RX-DIAG: implausible header addr=0x%02X tl=0x%02X (len=%u), drained %u trailing bytes", address, toggle_and_length, content_length, drained);
                     return;
                 }
 
@@ -86,13 +80,8 @@ namespace esphome
                     yield();
                 if (available() < remaining)
                 {
-                    uint8_t drained = 0;
                     while (available() > 0)
-                    {
                         read();
-                        drained++;
-                    }
-                    ESP_LOGD(TAG, "RX-DIAG: incomplete frame addr=0x%02X tl=0x%02X, expected %u more, drained %u", address, toggle_and_length, remaining, drained);
                     return;
                 }
 
@@ -101,15 +90,6 @@ namespace esphome
                 msg[0] = address;
                 msg[1] = toggle_and_length;
                 read_array(msg + 2, remaining); // read content and checksum
-
-                // RX-DIAG: dump the assembled frame so we can see exactly what the controller receives
-                {
-                    char buf[3 * (3 + 4) + 1];
-                    size_t pos = 0;
-                    for (uint8_t i = 0; i < (uint8_t)(content_length + 4) && pos + 3 < sizeof(buf); i++)
-                        pos += sprintf(buf + pos, "%02X ", msg[i]);
-                    ESP_LOGD(TAG, "RX-DIAG: frame [%s] (addr=0x%02X len=%u msg0=0x%02X)", buf, address, content_length, msg[2]);
-                }
 
                 // Read the checksum
                 uint16_t msg_checksum = msg[content_length + 3] << 8 | msg[content_length + 2];
