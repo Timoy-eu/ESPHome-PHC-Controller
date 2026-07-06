@@ -4,7 +4,6 @@
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/light/light_output.h"
 #include "../PHCController/util.h"
-#include <random>
 
 namespace esphome
 {

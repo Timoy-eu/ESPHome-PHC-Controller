@@ -83,3 +83,9 @@ Without previous reverse engineering work done by others this would have been a 
   - ESP8266 out-of-memory exception
   - Guru Meditation Error: exception caused by `LOOP_STACK_SIZE` exceeded
     - [solution](https://community.platformio.org/t/esp32-stack-configuration-reloaded/20994/2)
+- Modules not acknowledging reliably / "Device not responding" warnings after moving to the IDF
+  framework: the `TIMING_DELAY` response delay (see `PHCController.h`) was calibrated for the
+  Arduino framework's UART stack and has not been re-measured on IDF. Set `logger: level: DEBUG`
+  to see the "TX latency since last RX frame" measurement logged for every outgoing message and
+  adjust `TIMING_DELAY` so the total response time (measured latency + the delay itself) lands
+  close to the ~250us the original PHC controller uses.

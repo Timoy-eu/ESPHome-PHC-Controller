@@ -102,6 +102,7 @@ namespace esphome
                 }
 
                 last_message_time_ = millis();
+                frame_received_micros_ = micros();
                 process_command(&address, toggle, msg + 2, &content_length);
                 return;
             }
@@ -386,6 +387,11 @@ namespace esphome
             // skip writing if the bus is busy and rely on retransmits
             if (allow_weak_operation && available())
                 return;
+
+            // Calibration aid for TIMING_DELAY (see PHCController.h): only meaningful right after
+            // a request (i.e. shortly after frame_received_micros_ was set); enable debug logging
+            // to inspect it while tuning the response timing on real hardware.
+            ESP_LOGD(TAG, "TX latency since last RX frame: %u us", micros() - frame_received_micros_);
 
             // Pull the write pin HIGH
             if (flow_control_pin_ != NULL)

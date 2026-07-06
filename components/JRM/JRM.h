@@ -3,7 +3,6 @@
 #include "esphome/core/component.h"
 #include "esphome/components/cover/cover.h"
 #include "../PHCController/util.h"
-#include <random>
 
 // Position publish frequency in milliseconds
 #define POSITION_PUBLISH_PERIOD 500

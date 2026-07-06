@@ -3,15 +3,13 @@ import esphome.config_validation as cv
 from esphome.components import cover
 from esphome.const import CONF_ID
 
-from ..PHCController import CONTROLLER_ID, PHCController
+from ..PHCController.schema_helpers import module_schema, register_module
 
 DEPENDENCIES = ["PHCController"]
 
 JRM_cover_ns = cg.esphome_ns.namespace("JRM_cover")
 JRMCover = JRM_cover_ns.class_("JRM", cover.Cover, cg.Component)
 
-ADDRESS = "dip"
-CHANNEL = "channel"
 MAX_CLOSE_TIME = "max_close_time"
 MAX_OPEN_TIME = "max_open_time"
 
@@ -35,9 +33,6 @@ CONFIG_SCHEMA = cv.All(
     .extend(
         {
             cv.GenerateID(): cv.declare_id(JRMCover),
-            cv.Required(CONTROLLER_ID): cv.use_id(PHCController),
-            cv.Required(ADDRESS): cv.int_range(min=0, max=31),
-            cv.Required(CHANNEL): cv.int_range(min=0, max=3),
             cv.Optional(MAX_CLOSE_TIME, default="30s"): cv.All(
                 cv.positive_time_period_milliseconds,
                 cv.Range(
@@ -72,19 +67,17 @@ CONFIG_SCHEMA = cv.All(
             ),
         }
     )
+    .extend(module_schema(max_channel=3))
     .extend(cv.COMPONENT_SCHEMA),
     _validate,
 )
 
 
 def to_code(config):
-    controller = yield cg.get_variable(config[CONTROLLER_ID])
     var = cg.new_Pvariable(config[CONF_ID])
     yield cg.register_component(var, config)
     yield cover.register_cover(var, config)
 
-    cg.add(var.set_address(config[ADDRESS]))
-    cg.add(var.set_channel(config[CHANNEL]))
     cg.add(var.set_max_close_time(config[MAX_CLOSE_TIME]))
     cg.add(var.set_max_open_time(config[MAX_OPEN_TIME]))
 
@@ -92,4 +85,4 @@ def to_code(config):
         cg.add(var.set_close_time(config[ASSUME_POSITION][CLOSE_TIME]))
         cg.add(var.set_open_time(config[ASSUME_POSITION][OPEN_TIME]))
 
-    cg.add(controller.register_JRM(var))
+    yield from register_module(var, config, "register_JRM")

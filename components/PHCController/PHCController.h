@@ -12,8 +12,14 @@
 #define FLOW_PIN_PULL_HIGH_DELAY 0
 #define FLOW_PIN_PULL_LOW_DELAY 0
 
+// Delay before responding to a module request, in microseconds. The original PHC controller
+// answers ~250us after a request; PHC modules expect a similarly timed response.
+// IMPORTANT: This value was empirically calibrated for the Arduino framework's UART stack
+// overhead and has NOT been re-measured against the ESP-IDF framework (which replaced Arduino
+// as ESPHome dropped Arduino-framework support, see README). Enable debug logging ("logger:
+// level: DEBUG") to see the "TX latency since last RX frame" measurement logged from
+// write_array() and re-tune this constant if modules stop acknowledging reliably.
 #define TIMING_DELAY 150 // 250us on original PHC
-// This value has been adjusted, such that the measured delay is roughly equal to 250us. This has changed with arduino core 2.0+
 #define INITIAL_SYNC_DELAY 15
 
 namespace esphome
@@ -187,6 +193,12 @@ namespace esphome
              *
              */
             long last_message_time_ = 0;
+
+            /**
+             * @brief micros() timestamp of the last successfully parsed incoming frame.
+             * Used to log response latency for TIMING_DELAY calibration (see PHCController.h).
+             */
+            uint32_t frame_received_micros_ = 0;
 
             /**
              * @brief Determines if states have been synced on start-up.
