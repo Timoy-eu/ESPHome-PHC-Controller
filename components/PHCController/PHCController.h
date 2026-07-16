@@ -14,12 +14,11 @@
 
 // Delay before responding to a module request, in microseconds. The original PHC controller
 // answers ~250us after a request; PHC modules expect a similarly timed response.
-// IMPORTANT: This value was empirically calibrated for the Arduino framework's UART stack
-// overhead and has NOT been re-measured against the ESP-IDF framework (which replaced Arduino
-// as ESPHome dropped Arduino-framework support, see README). Enable debug logging ("logger:
-// level: DEBUG") to see the "TX latency since last RX frame" measurement logged from
-// write_array() and re-tune this constant if modules stop acknowledging reliably.
-#define TIMING_DELAY 150 // 250us on original PHC
+// Re-measured on ESP-IDF (see UPDATE_TESTING.md): the "TX latency since last RX frame" log showed
+// ~154us total with TIMING_DELAY=150, i.e. only ~4us of processing overhead on top of the delay
+// itself - so the old value answered ~96us too early. Raised to close that gap; re-measure and
+// adjust in ~30us steps (see UPDATE_TESTING.md) if modules still fail to acknowledge reliably.
+#define TIMING_DELAY 246 // targets ~250us total, measured ~4us processing overhead
 #define INITIAL_SYNC_DELAY 15
 
 namespace esphome
