@@ -391,7 +391,17 @@ namespace esphome
             // Calibration aid for TIMING_DELAY (see PHCController.h): only meaningful right after
             // a request (i.e. shortly after frame_received_micros_ was set); enable debug logging
             // to inspect it while tuning the response timing on real hardware.
-            ESP_LOGD(TAG, "TX latency since last RX frame: %u us", (unsigned int) (micros() - frame_received_micros_));
+            //
+            // write_array() runs on every single transmission (acks, resends, module config, echo),
+            // which on a busy bus is many times per second. Logging on every call sits right in the
+            // timing-critical path this diagnostic is meant to measure and can itself perturb it (CPU
+            // time formatting/queueing the log line, right before the transmission it just measured).
+            // Throttle to at most once per second - still enough samples to calibrate TIMING_DELAY by.
+            if (millis() - last_latency_log_ms_ >= 1000)
+            {
+                ESP_LOGD(TAG, "TX latency since last RX frame: %u us", (unsigned int) (micros() - frame_received_micros_));
+                last_latency_log_ms_ = millis();
+            }
 
             // Pull the write pin HIGH
             if (flow_control_pin_ != NULL)

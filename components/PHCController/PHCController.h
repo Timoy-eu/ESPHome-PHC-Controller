@@ -201,6 +201,12 @@ namespace esphome
             uint32_t frame_received_micros_ = 0;
 
             /**
+             * @brief millis() timestamp the TX latency diagnostic was last logged. Throttles that
+             * log (see write_array()) to once per second so it does not itself perturb bus timing.
+             */
+            uint32_t last_latency_log_ms_ = 0;
+
+            /**
              * @brief Determines if states have been synced on start-up.
              *
              */
