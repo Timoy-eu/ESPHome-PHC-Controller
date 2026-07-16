@@ -201,6 +201,15 @@ namespace esphome
             uint32_t frame_received_micros_ = 0;
 
             /**
+             * @brief Whether frame_received_micros_ has ever been set by a real received frame.
+             * Before the first valid frame, frame_received_micros_ is still its 0 initial value, so
+             * "micros() - frame_received_micros_" would just be time-since-boot (a huge, growing,
+             * meaningless number) rather than an actual latency. Gates the TX latency log in
+             * write_array() so it only prints once it can report something real.
+             */
+            bool has_received_frame_ = false;
+
+            /**
              * @brief millis() timestamp the TX latency diagnostic was last logged. Throttles that
              * log (see write_array()) to once per second so it does not itself perturb bus timing.
              */
