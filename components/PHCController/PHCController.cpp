@@ -391,7 +391,7 @@ namespace esphome
             // Calibration aid for TIMING_DELAY (see PHCController.h): only meaningful right after
             // a request (i.e. shortly after frame_received_micros_ was set); enable debug logging
             // to inspect it while tuning the response timing on real hardware.
-            ESP_LOGD(TAG, "TX latency since last RX frame: %u us", micros() - frame_received_micros_);
+            ESP_LOGD(TAG, "TX latency since last RX frame: %u us", (unsigned int) (micros() - frame_received_micros_));
 
             // Pull the write pin HIGH
             if (flow_control_pin_ != NULL)
