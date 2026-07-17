@@ -390,22 +390,42 @@ namespace esphome
             if (allow_weak_operation && available())
                 return;
 
-            // Calibration aid for TIMING_DELAY (see PHCController.h): only meaningful right after
-            // a request (i.e. shortly after frame_received_micros_ was set); enable debug logging
-            // to inspect it while tuning the response timing on real hardware.
+            // Calibration aid for the response timing (see timing_delay_ / UPDATE_TESTING.md).
             //
-            // write_array() runs on every single transmission (acks, resends, module config, echo),
-            // which on a busy bus is many times per second. Logging on every call sits right in the
-            // timing-critical path this diagnostic is meant to measure and can itself perturb it (CPU
-            // time formatting/queueing the log line, right before the transmission it just measured).
-            // Throttle to at most once per second - still enough samples to calibrate TIMING_DELAY by.
+            // Only transmissions that directly answer a just-received frame are meaningful samples:
+            // for those, "now - frame_received_micros_" is the on-wire response latency the modules
+            // see (~timing_delay_ + processing overhead). Spontaneous transmissions (user commands
+            // on an idle bus, resends) happen seconds after the last RX frame and would only add
+            // noise, so samples above a generous response-path threshold are ignored. The
+            // has_received_frame_ guard additionally keeps the pre-first-frame 0 baseline (delta
+            // would be time-since-boot) out of the statistics.
             //
-            // Before the first valid frame is parsed, frame_received_micros_ is still its 0 initial
-            // value, so the delta would just be time-since-boot (multi-second, growing, meaningless)
-            // rather than a real latency. Only log once we actually have a reference frame.
-            if (has_received_frame_ && millis() - last_latency_log_ms_ >= 1000)
+            // Instead of logging each sample (which sits right in the timing-critical path and can
+            // perturb the very timing being measured), accumulate min/max/avg and report once per
+            // second. The max-vs-min spread directly exposes scheduling jitter that a single sample
+            // per second would hide.
+            if (has_received_frame_)
             {
-                ESP_LOGD(TAG, "TX latency since last RX frame: %u us", (unsigned int) (micros() - frame_received_micros_));
+                uint32_t response_latency = micros() - frame_received_micros_;
+                if (response_latency < 5000)
+                {
+                    if (response_latency < latency_min_)
+                        latency_min_ = response_latency;
+                    if (response_latency > latency_max_)
+                        latency_max_ = response_latency;
+                    latency_sum_ += response_latency;
+                    latency_count_++;
+                }
+            }
+            if (latency_count_ > 0 && millis() - last_latency_log_ms_ >= 1000)
+            {
+                ESP_LOGD(TAG, "TX response latency: min=%u max=%u avg=%u us (%u samples)",
+                         (unsigned int) latency_min_, (unsigned int) latency_max_,
+                         (unsigned int) (latency_sum_ / latency_count_), (unsigned int) latency_count_);
+                latency_min_ = UINT32_MAX;
+                latency_max_ = 0;
+                latency_sum_ = 0;
+                latency_count_ = 0;
                 last_latency_log_ms_ = millis();
             }
 

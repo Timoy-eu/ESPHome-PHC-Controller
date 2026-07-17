@@ -58,16 +58,19 @@ fertig, keine weiteren Schritte nötig.
 Das Debug-Log gibt dir die Stellschraube:
 
 ```
-TX latency since last RX frame: 187 us
+TX response latency: min=249 max=312 avg=254 us (14 samples)
 ```
 
 Das ist die komplette Software-Zeit vom letzten empfangenen Byte bis kurz vor
-dem Losschicken der Antwort — **inklusive** des aktuellen `TIMING_DELAY`
+dem Losschicken der Antwort — **inklusive** des aktuellen `timing_delay`
 (geloggt in `write_array()`, siehe
-[PHCController.cpp](components/PHCController/PHCController.cpp)).
+[PHCController.cpp](components/PHCController/PHCController.cpp)). Gezählt
+werden nur Antwortpfad-Sendungen (<5ms nach einem empfangenen Frame);
+spontane Befehle auf ruhigem Bus fließen nicht ein. Die Spanne zwischen
+`min` und `max` zeigt direkt den Scheduling-Jitter — ein stark ausreißendes
+`max` bei unauffälligem `avg` ist das Signaturmuster des Volllast-Problems.
 
-- Ziehe den reinen Verarbeitungs-Overhead ab: `gemessener Wert − aktueller
-  TIMING_DELAY`.
+- Ziehe den reinen Verarbeitungs-Overhead ab: `avg − aktueller timing_delay`.
 - Der Zielwert ist ~250µs Gesamtlaufzeit (Richtwert des Original-STM-Controllers,
   keine hardware-exakte Spezifikation — die PHC-Module dürften Toleranz haben,
   wofür auch die Resend-Logik existiert).

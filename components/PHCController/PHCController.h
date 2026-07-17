@@ -233,6 +233,15 @@ namespace esphome
             uint32_t last_latency_log_ms_ = 0;
 
             /**
+             * @brief Response-path TX latency statistics accumulated between diagnostic log lines
+             * (see write_array()). min/max expose scheduling jitter that single samples would hide.
+             */
+            uint32_t latency_min_ = UINT32_MAX;
+            uint32_t latency_max_ = 0;
+            uint32_t latency_sum_ = 0;
+            uint32_t latency_count_ = 0;
+
+            /**
              * @brief Determines if states have been synced on start-up.
              *
              */
