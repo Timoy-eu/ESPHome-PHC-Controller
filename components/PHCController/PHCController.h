@@ -21,6 +21,12 @@
 #define TIMING_DELAY 246 // targets ~250us total, measured ~4us processing overhead
 #define INITIAL_SYNC_DELAY 15
 
+// Minimum spacing between transmitted module commands (see write_command()). After a command the
+// bus carries our own echo (5 bytes) plus the module's acknowledgement (6 bytes), ~7ms at 19200
+// baud 8N2 - a following command transmitted earlier would collide with the acknowledgement on the
+// half-duplex bus and desync the shared per-module toggle bit.
+#define MODULE_COMMAND_SPACING_MS 15
+
 namespace esphome
 {
     namespace phc_controller
@@ -38,8 +44,21 @@ namespace esphome
              * @param data Data to write to the bus
              * @param len Length of the given data
              * @param allow_weak_operation If true writing to the bus is not guaranteed
+             * @return true if the data was actually transmitted, false if it was skipped
              */
-            void write_array(const uint8_t *data, size_t len, bool allow_weak_operation);
+            bool write_array(const uint8_t *data, size_t len, bool allow_weak_operation);
+
+            /**
+             * @brief Writes a module command to the PHC-bus, pacing weak commands so that the
+             * previous command's echo and acknowledgement complete before the next command is
+             * transmitted (see MODULE_COMMAND_SPACING_MS).
+             *
+             * @param data Data to write to the bus
+             * @param len Length of the given data
+             * @param allow_weak_operation If true writing to the bus is not guaranteed
+             * @return true if the command was actually transmitted, false if it was skipped
+             */
+            bool write_command(const uint8_t *data, size_t len, bool allow_weak_operation);
             float get_setup_priority() const override
             {
                 return setup_priority::HARDWARE;
@@ -242,6 +261,12 @@ namespace esphome
             uint32_t latency_count_ = 0;
 
             /**
+             * @brief millis() timestamp of the last actually transmitted module command.
+             * Paces weak commands in write_command() (see MODULE_COMMAND_SPACING_MS).
+             */
+            uint32_t last_command_tx_ms_ = 0;
+
+            /**
              * @brief Determines if states have been synced on start-up.
              *
              */
@@ -267,7 +292,7 @@ inline void util::Module::set_controller(esphome::phc_controller::PHCController 
     toggle_map = controller->getToggleMap();
 }
 
-inline void util::Module::write_array(esphome::phc_controller::PHCController *controller, const uint8_t *data, size_t len, bool allow_weak_operation)
+inline bool util::Module::write_array(esphome::phc_controller::PHCController *controller, const uint8_t *data, size_t len, bool allow_weak_operation)
 {
-    controller->write_array(data, len, allow_weak_operation);
+    return controller->write_command(data, len, allow_weak_operation);
 };

@@ -25,11 +25,12 @@ namespace esphome
                 {
                     if (resend_counter_ < MAX_RESENDS)
                     {
-                        // Try resending as long as possible, double flip toggle
-                        int resend = resend_counter_;
-                        toggle_map->flip_toggle(this);
-                        write_state(target_operation_, target_position_);
-                        resend_counter_ = resend + 1;
+                        // Retry for as long as possible. Only attempts that actually reached the
+                        // wire consume resend budget - under bus contention weak writes are
+                        // frequently skipped, and counting those would burn through MAX_RESENDS
+                        // without the module ever seeing a single command.
+                        if (transmit_current_command_())
+                            resend_counter_++;
                     }
                     else
                     {
@@ -128,11 +129,11 @@ namespace esphome
             resend_counter_ = 0;
             target_operation_ = operation;
             operation_start_position_ = this->position;
-            toggle_map->flip_toggle(this);
+            has_transmitted_ = false;
 
             if (operation == COVER_OPERATION_IDLE)
             {
-                write_idle_operation(address, channel);
+                transmit_current_command_();
             }
             else
             {
@@ -176,14 +177,40 @@ namespace esphome
                     }
                 }
 
-                write_move_operation(address, channel, target_movement_time_, open);
+                move_open_ = open;
+                transmit_current_command_();
                 operation_start_time_ = millis();
             }
 
             last_request_ = millis();
         }
 
-        void JRM::write_idle_operation(uint8_t &address, uint8_t &channel)
+        bool JRM::transmit_current_command_()
+        {
+            // The toggle bit is an alternating-bit shared per module: a transmitted command must
+            // flip it exactly once relative to the previously transmitted command, and the module
+            // treats an unchanged toggle as a retransmission (re-ack without executing again).
+            // Compute the flip at transmission time and only commit it once the write actually
+            // reached the bus - committing a flip for a skipped weak write desyncs the shared
+            // toggle and makes the module ignore other channels' commands as duplicates.
+            bool tx_toggle = has_transmitted_ ? toggle_map->get_toggle(this) : !toggle_map->get_toggle(this);
+
+            bool sent;
+            if (target_operation_ == COVER_OPERATION_IDLE)
+                sent = write_idle_operation(address, channel, tx_toggle);
+            else
+                sent = write_move_operation(address, channel, target_movement_time_, move_open_, tx_toggle);
+
+            if (sent && !has_transmitted_)
+            {
+                toggle_map->set_toggle(this, tx_toggle);
+                has_transmitted_ = true;
+            }
+            last_request_ = millis();
+            return sent;
+        }
+
+        bool JRM::write_idle_operation(uint8_t &address, uint8_t &channel, bool toggle)
         {
             uint8_t message[6] = {0x00};
 
@@ -191,7 +218,7 @@ namespace esphome
             uint8_t function = (channel << 5) | 0x02;
 
             message[0] = static_cast<uint8_t>(JRM_MODULE_ADDRESS | address);
-            message[1] = static_cast<uint8_t>((toggle_map->get_toggle(this) ? 0x80 : 0x00) | 0x02);
+            message[1] = static_cast<uint8_t>((toggle ? 0x80 : 0x00) | 0x02);
             message[2] = function;
             message[3] = 0xFC; // Prio
 
@@ -199,10 +226,10 @@ namespace esphome
             message[4] = static_cast<uint8_t>(crc & 0xFF);
             message[5] = static_cast<uint8_t>((crc & 0xFF00) >> 8);
 
-            write_array(message, 6, false);
+            return write_array(message, 6, false);
         }
 
-        void JRM::write_move_operation(uint8_t &address, uint8_t &channel, uint16_t &time, bool open)
+        bool JRM::write_move_operation(uint8_t &address, uint8_t &channel, uint16_t &time, bool open, bool toggle)
         {
             uint8_t message[8] = {0x00};
 
@@ -210,7 +237,7 @@ namespace esphome
             uint8_t function = (channel << 5) | (open ? 0x05 : 0x06);
 
             message[0] = static_cast<uint8_t>(JRM_MODULE_ADDRESS | address);
-            message[1] = static_cast<uint8_t>((toggle_map->get_toggle(this) ? 0x80 : 0x00) | 0x04);
+            message[1] = static_cast<uint8_t>((toggle ? 0x80 : 0x00) | 0x04);
             message[2] = function;
             message[3] = 0x07;      // Prio
             message[4] = time;      // unsigned short time value
@@ -220,7 +247,7 @@ namespace esphome
             message[6] = static_cast<uint8_t>(crc & 0xFF);
             message[7] = static_cast<uint8_t>((crc & 0xFF00) >> 8);
 
-            write_array(message, 8, true);
+            return write_array(message, 8, true);
         }
 
     } // namespace JRM_cover

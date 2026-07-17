@@ -383,12 +383,28 @@ namespace esphome
             }
         }
 
-        void PHCController::write_array(const uint8_t *data, size_t len, bool allow_weak_operation)
+        bool PHCController::write_command(const uint8_t *data, size_t len, bool allow_weak_operation)
+        {
+            // Pace module commands: transmitting a new command before the previous command's echo
+            // and module acknowledgement have completed (~7ms) would collide with the ack on the
+            // half-duplex bus. Only weak commands are paced - strong ones (e.g. a cover STOP) must
+            // go out regardless.
+            if (allow_weak_operation && millis() - last_command_tx_ms_ < MODULE_COMMAND_SPACING_MS)
+                return false;
+
+            if (!write_array(data, len, allow_weak_operation))
+                return false;
+
+            last_command_tx_ms_ = millis();
+            return true;
+        }
+
+        bool PHCController::write_array(const uint8_t *data, size_t len, bool allow_weak_operation)
         {
 
             // skip writing if the bus is busy and rely on retransmits
             if (allow_weak_operation && available())
-                return;
+                return false;
 
             // Calibration aid for the response timing (see timing_delay_ / UPDATE_TESTING.md).
             //
@@ -459,6 +475,7 @@ namespace esphome
             // module class shares the same leading address byte, so a module acknowledgement that is
             // already buffered (modules answer ~250us after the command) would have its leading byte
             // consumed too, shifting the whole frame by one byte and corrupting the checksum.
+            return true;
         }
     } // namespace phc_controller
 } // namespace esphome

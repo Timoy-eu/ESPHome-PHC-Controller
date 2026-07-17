@@ -56,10 +56,26 @@ namespace esphome
 
         private:
             /**
+             * @brief Builds and transmits the command for the current target state.
+             * Handles the shared per-module toggle bit: the flip is computed at transmission time
+             * and only committed once a write actually reached the bus (see AMD.cpp).
+             *
+             * @return true if the command was actually transmitted
+             */
+            bool transmit_current_command_();
+
+            /**
              * @brief The entities target state which should be reached within the allowed retry time/count
              *
              */
             bool target_state = false;
+
+            /**
+             * @brief Whether the current target command has been transmitted at least once.
+             * Distinguishes a first transmission (flips the shared toggle -> new command) from a
+             * retransmission (same toggle -> module re-acks without executing twice).
+             */
+            bool has_transmitted_ = false;
 
             /**
              * @brief Timestamp of the last request sent by this entity

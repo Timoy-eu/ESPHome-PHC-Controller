@@ -163,10 +163,11 @@ namespace util
          * @param data Data to write to the bus
          * @param len Length of the given data
          * @param allow_weak_operation If true writing to the bus is not guaranteed
+         * @return true if the data was actually transmitted, false if it was skipped
          */
-        void write_array(const uint8_t *data, size_t len, bool allow_weak_operation)
+        bool write_array(const uint8_t *data, size_t len, bool allow_weak_operation)
         {
-            write_array(controller, data, len, allow_weak_operation);
+            return write_array(controller, data, len, allow_weak_operation);
         };
 
         /**
@@ -176,8 +177,9 @@ namespace util
          * @param data Data to write to the bus
          * @param len Length of the given data
          * @param allow_weak_operation If true writing to the bus is not guaranteed
+         * @return true if the data was actually transmitted, false if it was skipped
          */
-        virtual void write_array(esphome::phc_controller::PHCController *controller, const uint8_t *data, size_t len, bool allow_weak_operation);
+        virtual bool write_array(esphome::phc_controller::PHCController *controller, const uint8_t *data, size_t len, bool allow_weak_operation);
 
         /**
          * @brief Syncs phc and entity state by forcing an update on the phc sytem.

@@ -83,6 +83,16 @@ namespace esphome
         protected:
             void control(const cover::CoverCall &call) override;
             void write_state(cover::CoverOperation state, float position);
+
+            /**
+             * @brief Builds and transmits the command for the current target operation.
+             * Handles the shared per-module toggle bit: the flip is computed at transmission time
+             * and only committed once a write actually reached the bus (see JRM.cpp).
+             *
+             * @return true if the command was actually transmitted
+             */
+            bool transmit_current_command_();
+
             /**
              * @brief Writes a JRM move operation to the bus.
              *
@@ -90,16 +100,20 @@ namespace esphome
              * @param channel The desired channel
              * @param time Desired movement time
              * @param open True if the cover should be opened, false otherwise
+             * @param toggle Toggle bit to transmit with
+             * @return true if the command was actually transmitted
              */
-            void write_move_operation(uint8_t &address, uint8_t &channel, uint16_t &time, bool open);
+            bool write_move_operation(uint8_t &address, uint8_t &channel, uint16_t &time, bool open, bool toggle);
 
             /**
              * @brief Writes a JRM IDLE command to the bus.
              *
              * @param address The desired module address
              * @param channel The desired channels
+             * @param toggle Toggle bit to transmit with
+             * @return true if the command was actually transmitted
              */
-            void write_idle_operation(uint8_t &address, uint8_t &channel);
+            bool write_idle_operation(uint8_t &address, uint8_t &channel, bool toggle);
 
             /**
              * @brief Set the position, while ensuring non-assumed covers only have positions OPEN/CLOSED.
@@ -158,6 +172,19 @@ namespace esphome
              */
             long int operation_start_time_ = 0;
             int resend_counter_ = 0;
+
+            /**
+             * @brief Whether the current target command has been transmitted at least once.
+             * Distinguishes a first transmission (flips the shared toggle -> new command) from a
+             * retransmission (same toggle -> module re-acks without executing again).
+             */
+            bool has_transmitted_ = false;
+
+            /**
+             * @brief Movement direction of the current move command (true = open).
+             * Stored so retransmissions rebuild an identical frame.
+             */
+            bool move_open_ = true;
 
             /**
              * @brief The covers target operation state.
