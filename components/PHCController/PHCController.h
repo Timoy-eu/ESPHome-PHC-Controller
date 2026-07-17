@@ -87,6 +87,19 @@ namespace esphome
             };
 
             /**
+             * @brief Set the component version (short git hash, injected at codegen time).
+             * Logged in dump_config() so the actually compiled-in component revision is
+             * verifiable on the device - ESPHome's external_components git cache only
+             * refreshes branch refs once a day by default and can silently serve stale code.
+             *
+             * @param version Short git hash of the component checkout
+             */
+            void set_component_version(const char *version)
+            {
+                component_version_ = version;
+            };
+
+            /**
              * @brief Get the ToggleMap used by this controller
              *
              * @return util::ToggleMap*
@@ -187,6 +200,12 @@ namespace esphome
              * TIMING_DELAY; overridable from YAML via set_timing_delay() for calibration.
              */
             uint16_t timing_delay_ = TIMING_DELAY;
+
+            /**
+             * @brief Short git hash of the component checkout, injected at codegen time
+             * (see set_component_version()).
+             */
+            const char *component_version_ = "unknown";
 
             /**
              * @brief The flow control pin used by this controller

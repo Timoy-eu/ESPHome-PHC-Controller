@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
@@ -6,6 +8,33 @@ from esphome.components.uart import UARTComponent
 from esphome.const import CONF_ID
 
 AUTO_LOAD = ["cover", "light", "switch", "binary_sensor", "AMD", "EMD", "JRM"]
+
+
+def _component_version() -> str:
+    """Best-effort short git hash of the component checkout, for dump_config().
+
+    ESPHome caches external_components checkouts (and only refreshes git refs
+    once a day by default), so the compiled-in component version can silently
+    lag behind the remote branch. Reading the checkout's git HEAD at codegen
+    time and logging it on the device makes the running version verifiable.
+    """
+    try:
+        git_dir = Path(__file__).resolve().parent.parent.parent / ".git"
+        head = (git_dir / "HEAD").read_text().strip()
+        if not head.startswith("ref: "):
+            return head[:8]  # detached HEAD holds the hash directly
+        ref = head[5:]
+        ref_file = git_dir / ref
+        if ref_file.exists():
+            return ref_file.read_text().strip()[:8]
+        packed = git_dir / "packed-refs"
+        if packed.exists():
+            for line in packed.read_text().splitlines():
+                if line.endswith(" " + ref):
+                    return line.split(" ", 1)[0][:8]
+    except OSError:
+        pass
+    return "unknown"
 
 DEPENDENCIES = ["uart"]
 
@@ -46,3 +75,5 @@ def to_code(config):
 
     if TIMING_DELAY in config:
         cg.add(var.set_timing_delay(config[TIMING_DELAY]))
+
+    cg.add(var.set_component_version(_component_version()))

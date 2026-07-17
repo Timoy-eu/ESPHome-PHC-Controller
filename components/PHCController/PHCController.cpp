@@ -115,6 +115,7 @@ namespace esphome
         void PHCController::dump_config()
         {
             ESP_LOGCONFIG(TAG, "PHC Controller");
+            ESP_LOGCONFIG(TAG, "  Component version: %s", component_version_);
             check_uart_settings(19200, 2, uart::UART_CONFIG_PARITY_NONE, 8);
             ESP_LOGCONFIG(TAG, "  Timing delay: %u us", (unsigned int) timing_delay_);
             if (flow_control_pin_ != NULL)
