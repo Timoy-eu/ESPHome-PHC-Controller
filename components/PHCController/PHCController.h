@@ -286,6 +286,19 @@ namespace esphome
             uint32_t last_command_tx_ms_ = 0;
 
             /**
+             * @brief RX health counters, reported as a rate-limited one-line summary from loop().
+             * The resync paths drop stray/incomplete/implausible data silently, which makes a
+             * dead or mis-wired bus indistinguishable from a healthy idle one - these counters
+             * restore that visibility without per-event log flooding.
+             */
+            uint32_t rx_frames_ok_ = 0;
+            uint32_t rx_crc_failed_ = 0;
+            uint32_t rx_stray_bytes_ = 0;
+            uint32_t rx_incomplete_ = 0;
+            uint32_t rx_implausible_ = 0;
+            uint32_t last_rx_health_log_ms_ = 0;
+
+            /**
              * @brief Determines if states have been synced on start-up.
              *
              */

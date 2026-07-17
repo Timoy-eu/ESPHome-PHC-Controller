@@ -37,6 +37,18 @@ namespace esphome
 
         void PHCController::loop()
         {
+            // Rate-limited RX health summary. The resync paths below drop stray/incomplete/
+            // implausible data silently; without this a dead or mis-wired bus looks identical to
+            // a healthy idle one. Only logs when something happened since the last line.
+            if (millis() - last_rx_health_log_ms_ >= 1000 &&
+                (rx_frames_ok_ | rx_crc_failed_ | rx_stray_bytes_ | rx_incomplete_ | rx_implausible_))
+            {
+                ESP_LOGD(TAG, "RX health: ok=%u crc_fail=%u stray=%u incomplete=%u implausible=%u",
+                         (unsigned int) rx_frames_ok_, (unsigned int) rx_crc_failed_, (unsigned int) rx_stray_bytes_,
+                         (unsigned int) rx_incomplete_, (unsigned int) rx_implausible_);
+                rx_frames_ok_ = rx_crc_failed_ = rx_stray_bytes_ = rx_incomplete_ = rx_implausible_ = 0;
+                last_rx_health_log_ms_ = millis();
+            }
 
             if (available())
             {
@@ -51,6 +63,7 @@ namespace esphome
                 if (available() < 2)
                 {
                     read(); // drop the stray byte and resync next loop
+                    rx_stray_bytes_++;
                     return;
                 }
 
@@ -67,7 +80,10 @@ namespace esphome
                 // electrically stuck bus that data keeps arriving as fast as we read it, so an
                 // unbounded drain never returns and hangs the whole device.
                 if (content_length > 3)
+                {
+                    rx_implausible_++;
                     return;
+                }
 
                 // Wait briefly for the remainder of the frame (content + 2 byte checksum) to arrive.
                 // A complete frame is fully received within a few byte-times at 19200 baud; if it does
@@ -79,7 +95,10 @@ namespace esphome
                 while (available() < remaining && millis() - frame_start < 5)
                     yield();
                 if (available() < remaining)
+                {
+                    rx_incomplete_++;
                     return;
+                }
 
                 // Read the actual message content (2 byte prefix + content + 2 byte checksum)
                 uint8_t msg[content_length + 4];
@@ -96,6 +115,7 @@ namespace esphome
                 if (calculated_checksum != msg_checksum)
                 {
                     ESP_LOGW(TAG, "Recieved bad message (checksum missmatch)");
+                    rx_crc_failed_++;
 
                     // Skip the loop if the checksum is wrong
                     return;
@@ -104,6 +124,7 @@ namespace esphome
                 last_message_time_ = millis();
                 frame_received_micros_ = micros();
                 has_received_frame_ = true;
+                rx_frames_ok_++;
                 process_command(&address, toggle, msg + 2, &content_length);
                 return;
             }
