@@ -43,10 +43,19 @@ namespace esphome
             if (millis() - last_rx_health_log_ms_ >= 1000 &&
                 (rx_frames_ok_ | rx_crc_failed_ | rx_stray_bytes_ | rx_incomplete_ | rx_implausible_))
             {
-                ESP_LOGD(TAG, "RX health: ok=%u crc_fail=%u stray=%u incomplete=%u implausible=%u",
+                // Hex dump of the last valid frame so a module stuck in an ack-reject retry loop
+                // is identifiable by address and content from the summary line alone.
+                char ok_buf[3 * sizeof(last_ok_frame_) + 1] = "-";
+                size_t pos = 0;
+                for (uint8_t i = 0; i < last_ok_frame_len_ && pos + 3 < sizeof(ok_buf); i++)
+                    pos += sprintf(ok_buf + pos, "%02X ", last_ok_frame_[i]);
+                ESP_LOGD(TAG, "RX health: ok=%u crc_fail=%u stray=%u incomplete=%u implausible=%u | last_ok=[%s] last_imp=[%02X %02X] acks: emd=%u default=%u",
                          (unsigned int) rx_frames_ok_, (unsigned int) rx_crc_failed_, (unsigned int) rx_stray_bytes_,
-                         (unsigned int) rx_incomplete_, (unsigned int) rx_implausible_);
+                         (unsigned int) rx_incomplete_, (unsigned int) rx_implausible_,
+                         ok_buf, last_implausible_[0], last_implausible_[1],
+                         (unsigned int) acks_emd_input_, (unsigned int) acks_default_);
                 rx_frames_ok_ = rx_crc_failed_ = rx_stray_bytes_ = rx_incomplete_ = rx_implausible_ = 0;
+                acks_emd_input_ = acks_default_ = 0;
                 last_rx_health_log_ms_ = millis();
             }
 
@@ -82,6 +91,8 @@ namespace esphome
                 if (content_length > 3)
                 {
                     rx_implausible_++;
+                    last_implausible_[0] = address;
+                    last_implausible_[1] = toggle_and_length;
                     return;
                 }
 
@@ -125,6 +136,8 @@ namespace esphome
                 frame_received_micros_ = micros();
                 has_received_frame_ = true;
                 rx_frames_ok_++;
+                last_ok_frame_len_ = (uint8_t) std::min((size_t) (content_length + 4), sizeof(last_ok_frame_));
+                memcpy(last_ok_frame_, msg, last_ok_frame_len_);
                 process_command(&address, toggle, msg + 2, &content_length);
                 return;
             }
@@ -199,6 +212,7 @@ namespace esphome
                     uint8_t action = message[0] & 0x0F;
 
                     // Send extra (speedy) acknowledgement, seems to help
+                    acks_emd_input_++;
                     send_acknowledgement(*device_class_id, toggle);
 
                     //  Find the switch and set the state
@@ -269,6 +283,7 @@ namespace esphome
             }
 
             // Send default acknowledgement
+            acks_default_++;
             send_acknowledgement(*device_class_id, toggle);
         }
 

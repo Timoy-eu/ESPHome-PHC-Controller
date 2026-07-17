@@ -299,6 +299,19 @@ namespace esphome
             uint32_t last_rx_health_log_ms_ = 0;
 
             /**
+             * @brief Snapshots and ack-path counters for the RX health line: the last valid frame
+             * (identifies WHO is talking and WHAT it sends), the last implausible header pair
+             * (shows what corrupted/misaligned data looks like), and which acknowledgement path
+             * transmitted how often. Together these identify a module stuck in an ack-reject
+             * retry loop without needing per-frame logging.
+             */
+            uint8_t last_ok_frame_[8] = {0};
+            uint8_t last_ok_frame_len_ = 0;
+            uint8_t last_implausible_[2] = {0};
+            uint32_t acks_emd_input_ = 0;
+            uint32_t acks_default_ = 0;
+
+            /**
              * @brief Determines if states have been synced on start-up.
              *
              */
