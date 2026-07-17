@@ -116,6 +116,7 @@ namespace esphome
         {
             ESP_LOGCONFIG(TAG, "PHC Controller");
             check_uart_settings(19200, 2, uart::UART_CONFIG_PARITY_NONE, 8);
+            ESP_LOGCONFIG(TAG, "  Timing delay: %u us", (unsigned int) timing_delay_);
             if (flow_control_pin_ != NULL)
                 LOG_PIN("flow_control_pin: ", flow_control_pin_);
 
@@ -136,7 +137,7 @@ namespace esphome
                 if (message[0] == 0xFF)
                 {
                     //  Configure EMD
-                    delayMicroseconds(TIMING_DELAY);
+                    delayMicroseconds(timing_delay_);
                     send_emd_config(device_id);
                     return;
                 }
@@ -199,7 +200,7 @@ namespace esphome
                 // Initial configuration request message
                 if (message[0] == 0xFF)
                 {
-                    delayMicroseconds(TIMING_DELAY);
+                    delayMicroseconds(timing_delay_);
                     send_amd_config(device_id);
                     return;
                 }
@@ -257,7 +258,7 @@ namespace esphome
             message[3] = static_cast<uint8_t>(crc & 0xFF);
             message[4] = static_cast<uint8_t>((crc & 0xFF00) >> 8);
 
-            delayMicroseconds(TIMING_DELAY);
+            delayMicroseconds(timing_delay_);
             write_array(message, 5, true);
         }
 

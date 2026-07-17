@@ -71,10 +71,16 @@ dem Losschicken der Antwort — **inklusive** des aktuellen `TIMING_DELAY`
 - Der Zielwert ist ~250µs Gesamtlaufzeit (Richtwert des Original-STM-Controllers,
   keine hardware-exakte Spezifikation — die PHC-Module dürften Toleranz haben,
   wofür auch die Resend-Logik existiert).
-- Passe `TIMING_DELAY` in
-  [PHCController.h](components/PHCController/PHCController.h) in kleinen
-  Schritten an (z. B. ±30µs), flashe neu, beobachte wieder Schritt 2.
-  Iterativ, ohne zusätzliche Hardware.
+- Passe den Wert in kleinen Schritten an (z. B. ±30µs), flashe neu, beobachte
+  wieder Schritt 2. Iterativ, ohne zusätzliche Hardware. Der Wert lässt sich
+  direkt in der YAML-Konfiguration setzen — keine Code-Änderung nötig:
+
+  ```yaml
+  PHCController:
+    id: controller1
+    uart_id: bus
+    timing_delay: 150  # Mikrosekunden; Default siehe PHCController.h
+  ```
 
 ## 4. Wann doch Mess-Hardware sinnvoll ist
 

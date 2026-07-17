@@ -56,6 +56,18 @@ namespace esphome
             };
 
             /**
+             * @brief Override the delay (microseconds) before answering a module request.
+             * Configurable from YAML ("timing_delay") so the value can be calibrated on real
+             * hardware without code changes; defaults to TIMING_DELAY.
+             *
+             * @param timing_delay Response delay in microseconds
+             */
+            void set_timing_delay(uint16_t timing_delay)
+            {
+                timing_delay_ = timing_delay;
+            };
+
+            /**
              * @brief Get the ToggleMap used by this controller
              *
              * @return util::ToggleMap*
@@ -150,6 +162,12 @@ namespace esphome
             void sync_states();
 
             HighFrequencyLoopRequester high_freq_;
+
+            /**
+             * @brief Delay (microseconds) before answering a module request. Defaults to
+             * TIMING_DELAY; overridable from YAML via set_timing_delay() for calibration.
+             */
+            uint16_t timing_delay_ = TIMING_DELAY;
 
             /**
              * @brief The flow control pin used by this controller
